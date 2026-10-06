@@ -25,10 +25,13 @@ jobs:
         run: |
           cp .config .config.bak
           make defconfig
+          # 强制指定目标设备 netcore_n60pro
+          echo "CONFIG_TARGET_mediatek_mt7986_DEVICE_netcore_n60pro=y" >> .config
+          make defconfig
 
       - name: Compile firmware
         run: |
-          make -j$(nproc)
+          make -j$(nproc) DEVICE=netcore_n60pro
 
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
