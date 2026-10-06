@@ -21,13 +21,13 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: Config cleanup, only keep netcore_n60pro
+      - name: Config cleanup, only keep netcore_n60
         run: |
           cp .config .config.bak
           # 删除 .config 里面所有 mt7986 设备的配置项
           sed -i '/CONFIG_TARGET_mediatek_mt7986_DEVICE_/d' .config
-          # 只开启 N60Pro
-          echo "CONFIG_TARGET_mediatek_mt7986_DEVICE_netcore_n60pro=y" >> .config
+          # 正确设备名：netcore_n60
+          echo "CONFIG_TARGET_mediatek_mt7986_DEVICE_netcore_n60=y" >> .config
           # 重新生成配置
           make defconfig
           # 打印选中设备用于日志核对
