@@ -8,32 +8,36 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - name: Checkout code
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install build dependencies
         run: |
           sudo apt update
           sudo apt install -y build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses-dev libssl-dev python3 python3-pip python3-setuptools python3-dev rsync unzip wget zlib1g-dev
 
-      - name: Update and install feeds
+      - name: Update feeds & install packages
         run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: Load config
+      - name: Config cleanup, only keep netcore_n60pro
         run: |
           cp .config .config.bak
-          make defconfig
-          # 强制指定目标设备 netcore_n60pro
+          # 删除 .config 里面所有 mt7986 设备的配置项
+          sed -i '/CONFIG_TARGET_mediatek_mt7986_DEVICE_/d' .config
+          # 只开启 N60Pro
           echo "CONFIG_TARGET_mediatek_mt7986_DEVICE_netcore_n60pro=y" >> .config
+          # 重新生成配置
           make defconfig
+          # 打印选中设备用于日志核对
+          grep CONFIG_TARGET_mediatek_mt7986_DEVICE .config
 
       - name: Compile firmware
         run: |
-          make -j$(nproc) DEVICE=netcore_n60pro
+          make -j$(nproc)
 
-      - name: Upload firmware artifacts
+      - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
           name: N60Pro-ImmortalWrt-Firmware
