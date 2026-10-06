@@ -16,21 +16,126 @@ jobs:
           sudo apt update
           sudo apt install -y build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses-dev libssl-dev python3 python3-pip python3-setuptools python3-dev rsync unzip wget zlib1g-dev
 
+      - name: Apply Netcore N60 Pro patch
+        run: |
+          # 写入N60 Pro DTS文件 target/linux/mediatek/dts/mt7986a-netcore-n60-pro.dts
+          cat > target/linux/mediatek/dts/mt7986a-netcore-n60-pro.dts <<'EOF'
+/dts-v1/;
+#include "mt7986.dtsi"
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/linux-event-codes.h>
+
+/ {
+	model = "Netcore N60 Pro";
+	compatible = "netcore,n60-pro", "mediatek,mt7986a";
+
+	aliases {
+		serial0 = &uart0;
+		label-mac-device = &gmac0;
+		led-boot = &led_status_red;
+		led-failsafe = &led_status_red;
+		led-running = &led_status_blue;
+		led-upgrade = &led_status_blue;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	memory@40000000 {
+		device_type = "memory";
+		reg = <0x40000000 0x20000000>; /* 512MB */
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+		reset {
+			label = "reset";
+			linux,code = <KEY_RESTART>;
+			gpios = <&pio 9 GPIO_ACTIVE_LOW>;
+		};
+	};
+
+	leds {
+		compatible = "gpio-leds";
+		led_status_red: status_red {
+			label = "red:status";
+			gpios = <&pio 10 GPIO_ACTIVE_LOW>;
+		};
+		led_status_blue: status_blue {
+			label = "blue:status";
+			gpios = <&pio 11 GPIO_ACTIVE_LOW>;
+		};
+	};
+};
+
+&spi0 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&spi0_pins>;
+
+	flash@0 {
+		compatible = "spi-nand";
+		reg = <0>;
+		spi-max-frequency = <50000000>;
+	};
+};
+
+&gmac0 {
+	status = "okay";
+	phy-mode = "2500base-x";
+	phy-handle = <&phy0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&gmac0_pins>;
+};
+
+&gmac1 {
+	status = "okay";
+	phy-mode = "2500base-x";
+	phy-handle = <&phy1>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&gmac1_pins>;
+};
+
+&usb {
+	status = "okay";
+};
+
+&uart0 {
+	status = "okay";
+};
+
+&pcie0 {
+	status = "okay";
+};
+EOF
+
+          # 在 filogic.mk 添加设备定义 target/linux/mediatek/image/filogic.mk
+          echo >> target/linux/mediatek/image/filogic.mk
+          cat >> target/linux/mediatek/image/filogic.mk <<'EOF'
+define Device/netcore_n60-pro
+  DEVICE_VENDOR := Netcore
+  DEVICE_MODEL := N60 Pro
+  DEVICE_DTS := mt7986a-netcore-n60-pro
+  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7986-firmware mt7986-wo-firmware kmod-usb3
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+endef
+TARGET_DEVICES += netcore_n60-pro
+EOF
+
       - name: Update feeds & install packages
         run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: Config cleanup, only keep netcore_n60
+      - name: Config cleanup, only keep netcore_n60-pro
         run: |
           cp .config .config.bak
-          # 删除 .config 里面所有 mt7986 设备的配置项
+          # 删除所有mt7986设备选项
           sed -i '/CONFIG_TARGET_mediatek_mt7986_DEVICE_/d' .config
-          # 正确设备名：netcore_n60
-          echo "CONFIG_TARGET_mediatek_mt7986_DEVICE_netcore_n60=y" >> .config
-          # 重新生成配置
+          # 启用新增N60-Pro设备
+          echo "CONFIG_TARGET_mediatek_mt7986_DEVICE_netcore_n60-pro=y" >> .config
           make defconfig
-          # 打印选中设备用于日志核对
           grep CONFIG_TARGET_mediatek_mt7986_DEVICE .config
 
       - name: Compile firmware
