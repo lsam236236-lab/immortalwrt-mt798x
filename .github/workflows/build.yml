@@ -1,0 +1,37 @@
+name: Build ImmortalWrt N60Pro
+on:
+  push:
+    branches: [ openwrt-21.02 ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses-dev libssl-dev python3 python3-pip python3-setuptools python3-dev rsync unzip wget zlib1g-dev
+
+      - name: Update and install feeds
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Load config
+        run: |
+          cp .config .config.bak
+          make defconfig
+
+      - name: Compile firmware
+        run: |
+          make -j$(nproc)
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: N60Pro-ImmortalWrt-Firmware
+          path: bin/targets/mediatek/mt7986/*.bin
